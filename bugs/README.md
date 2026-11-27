@@ -7,3 +7,5 @@ Minimized reproducers of fixed bugs; the first line of each `.lp` is the failing
 `disj_superfluous_weight_body.aspif`: `clasp --trans-ext=no -n0` reports the non-model {7}.
 `usc_lookahead_eroot.aspif`: `clingo -n0 --opt-mode=optN --opt-strategy=usc --lookahead=atom` claims optimum `0 7 0`, but `0 7 -3` exists.
 `unfounded_eq_atom_merge.aspif`: `clasp --eq=2 -n0` reports 3 answer sets instead of 2 (one has the unfounded loop 9, 15).
+`superfluous_head_lost_model.aspif`: `clasp --trans-ext=no -n0` reports 2 answer sets instead of 3 (fixed upstream, #124).
+`superfluous_head_integ.lp`: `clingo --trans-ext=integ -n0` reports 1 answer set instead of 2 (same cause).
