@@ -1,5 +1,5 @@
 #!/bin/bash
-# tmux session with one fuzz.py per window. Usage: ./fuzz_session.sh [--num N] [fuzz.py options]
+# tmux session with one fuzz.py per window, a third of them on big programs. Usage: ./fuzz_session.sh [--num N] [fuzz.py options]
 
 SESSION="fuzzing clingo"
 DIR="$(dirname "$(realpath "$0")")"
@@ -15,6 +15,9 @@ if [ "$1" = "--num" ]; then
 fi
 
 CMD="./fuzz.py $*"
+BIG_CMD="./fuzz.py --size big --tout 10 $*"
+NUM_BIG=$((NUM_WINDOWS / 3))
+[[ " $* " == *" --size"* ]] && NUM_BIG=0
 
 if tmux has-session -t "$SESSION" 2>/dev/null; then
   echo "Session '$SESSION' already exists, attaching..."
@@ -22,11 +25,11 @@ if tmux has-session -t "$SESSION" 2>/dev/null; then
   exit 0
 fi
 
-tmux new-session -d -s "$SESSION" -c "$DIR" -n "fuzz-1"
-tmux send-keys -t "$SESSION:1" "$CMD" Enter
-for i in $(seq 2 "$NUM_WINDOWS"); do
-  tmux new-window -t "$SESSION" -c "$DIR" -n "fuzz-$i"
-  tmux send-keys -t "$SESSION:$i" "$CMD" Enter
+for i in $(seq 1 "$NUM_WINDOWS"); do
+  if [ "$i" -le "$NUM_BIG" ]; then c="$BIG_CMD"; n="big-$i"; else c="$CMD"; n="fuzz-$i"; fi
+  if [ "$i" = 1 ]; then tmux new-session -d -s "$SESSION" -c "$DIR" -n "$n"
+  else                  tmux new-window -t "$SESSION" -c "$DIR" -n "$n"; fi
+  tmux send-keys -t "$SESSION:$i" "$c" Enter
 done
 tmux select-window -t "$SESSION:1"
 tmux attach -t "$SESSION"

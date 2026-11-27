@@ -24,7 +24,7 @@ The release build keeps asserts on (no `-DNDEBUG`).
 
 ```bash
 ./fuzz.py [--task enum|opt|proj] [--size small|normal|big] [--tout 5] [--keep-going]
-./fuzz_session.sh [--num N] [fuzz.py options]   # one instance per physical core, in tmux
+./fuzz_session.sh [--num N] [fuzz.py options]   # one instance per physical core in tmux, a third on --size big
 ```
 
 On a bug, `fuzz.py` prints a `fuzz.py --check ...` line that reruns just the reference and the failing run;
