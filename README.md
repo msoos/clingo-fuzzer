@@ -28,6 +28,7 @@ The release build keeps asserts on (no `-DNDEBUG`).
 ```
 
 On a bug, `fuzz.py` prints a `fuzz.py --check ...` line that reruns just the reference and the failing run;
-`./minim.py` takes the same arguments and writes `<file>_min.lp` with fewer options and lines.
+`./minim.py` takes the same arguments and writes `<file>_min.lp` (or `.aspif`): it drops options, statements, and
+parts of statements (body/head literals, aggregate elements, weights and bounds).
 
 Minimized reproducers of bugs found so far are in `bugs/`.

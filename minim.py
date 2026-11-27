@@ -190,6 +190,68 @@ def reduce_node(node, rebuild, test, pool):
     return (sep, kids)
 
 
+def parse_aspif(line):
+    t = line.split()
+    if not t or not t[0].isdigit():
+        return None
+    if t[0] == "4":
+        return {"t": 4, "name": t[2], "body": list(map(int, t[4:4 + int(t[3])])), "w": None}
+    v = list(map(int, t))
+    if t[0] == "1":
+        h = v[2]
+        st = {"t": 1, "H": v[1], "head": v[3:3 + h]}
+        r = v[3 + h:]
+        if r[0] == 0:
+            st.update(B=0, body=r[2:2 + r[1]], w=None)
+        else:
+            st.update(B=1, bound=r[1], body=r[3::2][:r[2]], w=r[4::2][:r[2]])
+        return st
+    if t[0] == "2":
+        return {"t": 2, "prio": v[1], "body": v[3::2][:v[2]], "w": v[4::2][:v[2]]}
+    if t[0] == "8":
+        return {"t": 8, "u": v[1], "v": v[2], "body": v[4:4 + v[3]], "w": None}
+    return None
+
+
+def show_aspif(st):
+    b = st["body"]
+    wl = [x for l, w in zip(b, st["w"]) for x in (l, w)] if st.get("w") is not None else b
+    if st["t"] == 1:
+        body = [0, len(b), *b] if st["B"] == 0 else [1, st["bound"], len(b), *wl]
+        out = [1, st["H"], len(st["head"]), *st["head"], *body]
+    elif st["t"] == 2:
+        out = [2, st["prio"], len(b), *wl]
+    elif st["t"] == 8:
+        out = [8, st["u"], st["v"], len(b), *b]
+    else:
+        return " ".join(map(str, [4, len(st["name"]), st["name"], len(b), *b]))
+    return " ".join(map(str, out))
+
+
+def reduce_aspif(st, rebuild, test, pool):
+    """Shrink the head and body lists of one aspif statement, then weight bounds."""
+    def with_body(ks):
+        x = dict(st, body=[st["body"][i] for i in ks])
+        if st.get("w") is not None:
+            x["w"] = [st["w"][i] for i in ks]
+        return x
+    keep = ddmin(len(st["body"]), lambda ks: test(rebuild(with_body(ks))), pool)
+    st = with_body(keep)
+    if st["t"] == 1:
+        keep = ddmin(len(st["head"]), lambda ks: test(rebuild(dict(st, head=[st["head"][i] for i in ks]))), pool)
+        st = dict(st, head=[st["head"][i] for i in keep])
+        if st["B"] == 1:
+            for k in sorted({1, st["bound"] // 2, st["bound"] - 1}):
+                if 0 < k < st["bound"] and test(rebuild(dict(st, bound=k))):
+                    st = dict(st, bound=k)
+                    break
+            if all(w == 1 for w in st["w"]) and st["bound"] == len(st["body"]):
+                trial = dict(st, B=0, w=None)
+                if test(rebuild(trial)):
+                    st = trial
+    return st
+
+
 def main():
     args = norm(sys.argv[1:])
     jobs = 8
@@ -230,6 +292,16 @@ def main():
                 def rebuild(node, i=i, tail=tail):
                     return text(lines[:i] + [show(node) + tail] + lines[i + 1:])
                 lines[i] = show(reduce_node(parse(core), rebuild, lambda t: oracle(t, opts), pool)) + tail
+            print(f"Inside statements: done  [{oracle.calls} checks]")
+        elif ext == ".aspif":
+            for i in range(len(lines)):
+                st = parse_aspif(lines[i])
+                if st is None:
+                    continue
+
+                def rebuild(x, i=i):
+                    return text(lines[:i] + [show_aspif(x)] + lines[i + 1:])
+                lines[i] = show_aspif(reduce_aspif(st, rebuild, lambda t: oracle(t, opts), pool))
             print(f"Inside statements: done  [{oracle.calls} checks]")
 
     dst = os.path.splitext(src)[0] + "_min" + ext
