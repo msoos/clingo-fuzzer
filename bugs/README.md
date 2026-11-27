@@ -5,5 +5,5 @@ Minimized reproducers of fixed bugs; the first line of each `.lp` is the failing
 `disj_removed_support_backprop.aspif`: `clasp --backprop` fails an assertion.
 `vmtf_activity_shift.aspif`: `clasp --heuristic=vmtf -n0` on the UBSan build reports an undefined shift.
 `disj_superfluous_weight_body.aspif`: `clasp --trans-ext=no -n0` reports the non-model {7}.
-`open_usc_lookahead_optN.aspif`: `clingo -n0 --opt-mode=optN --opt-strategy=usc --lookahead=atom` claims optimum `0 7 0`, but `0 7 -3` exists (also in the original clasp; not fixed yet).
+`usc_lookahead_eroot.aspif`: `clingo -n0 --opt-mode=optN --opt-strategy=usc --lookahead=atom` claims optimum `0 7 0`, but `0 7 -3` exists.
 `unfounded_eq_atom_merge.aspif`: `clasp --eq=2 -n0` reports 3 answer sets instead of 2 (one has the unfounded loop 9, 15).
