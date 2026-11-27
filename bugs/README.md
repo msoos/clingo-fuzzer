@@ -9,3 +9,4 @@ Minimized reproducers of fixed bugs; the first line of each `.lp` is the failing
 `unfounded_eq_atom_merge.aspif`: `clasp --eq=2 -n0` reports 3 answer sets instead of 2 (one has the unfounded loop 9, 15).
 `superfluous_head_lost_model.aspif`: `clasp --trans-ext=no -n0` reports 2 answer sets instead of 3 (fixed upstream, #124).
 `superfluous_head_integ.lp`: `clingo --trans-ext=integ -n0` reports 1 answer set instead of 2 (same cause).
+`disj_eq_atom_backprop.aspif`: `clasp --backprop` fails an assertion (remaining disjunction atom merged into an eq atom).

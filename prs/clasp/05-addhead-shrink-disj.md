@@ -1,6 +1,6 @@
-# Fix assertion when a shrinking disjunction has an eq or removed support
+# Fix assertion when a disjunction shrinks to one atom
 
-When all but one atom of a disjunction become false, `PrgDisj::propagateAssigned()` adds the remaining atom as a head of the disjunction's supports. A support may already be equivalent to another body, or removed.
+When all but one atom of a disjunction become false, `PrgDisj::propagateAssigned()` adds the remaining atom as a head of the disjunction's supports. A support may already be equivalent to another body, or removed, and the atom may have been merged into an equivalent atom.
 
 ```
 $ clasp --backprop in.aspif
@@ -34,6 +34,30 @@ asp 1 0 0
 1 0 1 12 0 1 22
 0
 ```
-Before: same assertion. After: `UNSATISFIABLE`.
+Before: same assertion. After: `SATISFIABLE`.
 
-Add the head to the root body of the support, and skip supports that were removed. Found by differential fuzzing.
+Merged atom, same command:
+```
+asp 1 0 0
+1 1 1 4 0 0
+1 0 1 5 0 0
+1 0 1 6 0 1 -7
+1 0 1 7 0 1 -4
+1 0 1 8 0 1 7
+1 0 1 10 0 1 -4
+1 0 0 0 2 12 -7
+1 0 1 18 0 1 -19
+1 0 1 21 0 1 -10
+1 0 0 0 2 -21 20
+1 0 2 10 20 0 1 -18
+1 0 1 22 0 0
+1 1 1 19 0 0
+1 0 1 28 0 0
+1 0 1 9 0 0
+1 0 0 0 1 11
+1 0 1 12 0 0
+0
+```
+Before: same assertion. After: `SATISFIABLE`.
+
+Add the root atom as head of the root body of the support, and skip supports that were removed. Found by differential fuzzing.
