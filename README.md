@@ -32,3 +32,13 @@ On a bug, `fuzz.py` prints a `fuzz.py --check ...` line that reruns just the ref
 parts of statements (body/head literals, aggregate elements, weights and bounds).
 
 Minimized reproducers of bugs found so far are in `bugs/`.
+
+## Known non-bugs
+
+The fuzzer avoids these, as they are by design or unspecified:
+- Conflicting `#external` declarations for one atom: gringo emits independent statements in reverse source order and
+  clasp lets the last one win, so the first declaration wins; `--text` output read back gives the other one.
+  The generator declares each external atom only once.
+- An external atom stays external unless a rule for it survives grounding, so for
+  `bugs/notabug_text_external_rule.lp` its `--text` output (where gringo can drop the rule on reading it back) has
+  other answer sets. The text pipeline is skipped for programs with `#external`.

@@ -1,5 +1,5 @@
 Minimized reproducers of fixed bugs; the first line of each `.lp` is the failing command.
-`open_*` are inconsistencies that were not fixed (unclear intended semantics).
+`notabug_*` are inconsistencies that are by design (see Known non-bugs in ../README.md).
 `dup_models_*.aspif`: `clasp --eq=0 -n0` reports twice as many models as there are.
 `unfounded_merged_body_lits.aspif`: `clasp -n0` reports an extra answer set with atom 1 and 5 (5 is unfounded).
 `disj_removed_support_backprop.aspif`: `clasp --backprop` fails an assertion.
