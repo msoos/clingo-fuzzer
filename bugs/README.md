@@ -17,3 +17,4 @@ Minimized reproducers of fixed bugs; the first line of each `.lp` is the failing
 `dup_models_false_body_var.aspif`: `clasp -n0` reports 4 models instead of 2 (each answer set twice; unconstrained var of a body derived false during eq-preprocessing).
 `transform_eq_body.aspif`: `clasp --trans-ext=choice` fails `relevant() && h->relevant()` in `PrgBody::addHead()` (rule transformation used a merged body).
 `transform_choice_head_scc.lp`: `clingo --trans-ext=scc -n0` reports 2 answer sets instead of 3 (choice head turned into a normal head when transforming a recursive sum rule).
+`transform_integrity_scc.aspif`: `clasp --trans-ext=scc` fails `pos < size` in `Span::operator[]` (transformed rule h :- not h has no head after simplification).
