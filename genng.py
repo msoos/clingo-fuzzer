@@ -17,14 +17,17 @@ preds = {f"p{i}": rnd.randint(0, 2) for i in range(rnd.randint(2, 6))}
 UNARY = [q for q, ar in preds.items() if ar == 1]
 NARY = [q for q, ar in preds.items() if ar >= 1]
 VARS = ["X", "Y", "Z"]
+FUNC = rnd.random() < 0.3  # function terms f(t) as arguments in this program
 
 
 class Term:
     """A variable, a constant, var+const / var*const, or a pool of constants; evaluated under a substitution."""
-    def __init__(self, var=None, const=0, op=None, pool=None):
-        self.var, self.const, self.op, self.pool = var, const, op, pool
+    def __init__(self, var=None, const=0, op=None, pool=None, func=False):
+        self.var, self.const, self.op, self.pool, self.func = var, const, op, pool, func
 
     def show(self):
+        if self.func:
+            return "f(" + Term(self.var, self.const, self.op, self.pool).show() + ")"
         if self.pool:  # parenthesized: a bare ';' would separate whole argument tuples
             return "(" + ";".join(map(str, self.pool)) + ")"
         if self.var is None:
@@ -32,6 +35,9 @@ class Term:
         if self.op is None:
             return self.var
         return f"{self.var}{self.op}{self.const}"
+
+    def gshow(self, s):
+        return f"f({self.ev(s)})" if self.func else str(self.ev(s))
 
     def ev(self, s):
         if self.var is None:
@@ -41,6 +47,12 @@ class Term:
 
 
 def rterm(vs, arith):
+    t = _rterm(vs, arith)
+    t.func = FUNC and rnd.random() < 0.3
+    return t
+
+
+def _rterm(vs, arith):
     if vs and rnd.random() < 0.8:
         v = rnd.choice(vs)
         if arith and rnd.random() < 0.25:
@@ -58,7 +70,7 @@ def show_atom(at, s=None):
     pred, args = at
     if not args:
         return pred
-    return f"{pred}({','.join(str(t.ev(s)) if s is not None else t.show() for t in args)})"
+    return f"{pred}({','.join(t.gshow(s) if s is not None else t.show() for t in args)})"
 
 
 CMP = ["<", "<=", "!=", "=", ">"]
@@ -72,10 +84,12 @@ def gen_rule():
     """Returns (nonground text, variables, function substitution -> list of ground rule texts)."""
     nv = rnd.randint(0, 3)
     vs = VARS[:nv]
-    pos = [("d", [Term(v)]) for v in vs]  # safety: every variable is bound by d/1
+    # the last variable may be bound by an assignment Z = X+c or an interval Z = X..X+c instead of d/1
+    binder = (rnd.choice(["assign", "interval"]), rnd.randint(0, 2)) if nv >= 2 and rnd.random() < 0.3 else None
+    pos = [("d", [Term(v)]) for v in (vs[:-1] if binder else vs)]  # safety: every variable is bound
     extra = [ratom(vs) for _ in range(rnd.randint(0, 2))]
     neg = [ratom(vs) for _ in range(rnd.randint(0, 2))]
-    cmps = [(rnd.choice(CMP), rterm(vs, True), rterm(vs, True)) for _ in range(rnd.randint(0, 2) if vs else 0)]
+    cmps = [(rnd.choice(CMP), _rterm(vs, True), _rterm(vs, True)) for _ in range(rnd.randint(0, 2) if vs else 0)]
     # a positive body atom with a pool argument: one rule per alternative
     pool = None
     if NARY and rnd.random() < 0.2:
@@ -98,6 +112,8 @@ def gen_rule():
 
     def body_ng():
         parts = [show_atom(x) for x in pos + extra] + ["not " + show_atom(x) for x in neg]
+        if binder:
+            parts.append(f"{vs[-1]} = {vs[0]}+{binder[1]}" if binder[0] == "assign" else f"{vs[-1]} = {vs[0]}..{vs[0]}+{binder[1]}")
         if pool:
             parts.append(show_atom(pool[:2]))
         if condlit:
@@ -156,6 +172,12 @@ def gen_rule():
     else:
         ng = text(show_atom(head), body_ng())
         g = lambda s: [text(show_atom(head, s), b) for b in bodies_g(s)]
+    if binder:
+        inner = g
+        def g(s):
+            vals = [s[vs[0]] + binder[1]] if binder[0] == "assign" else range(s[vs[0]], s[vs[0]] + binder[1] + 1)
+            return [r for v in vals for r in inner(dict(s, **{vs[-1]: v}))]
+        return ng, vs[:-1], g
     return ng, vs, g
 
 
