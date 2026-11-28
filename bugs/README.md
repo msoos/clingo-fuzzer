@@ -11,3 +11,4 @@ Minimized reproducers of fixed bugs; the first line of each `.lp` is the failing
 `superfluous_head_integ.lp`: `clingo --trans-ext=integ -n0` reports 1 answer set instead of 2 (same cause).
 `disj_eq_atom_backprop.aspif`: `clasp --backprop` fails an assertion (remaining disjunction atom merged into an eq atom).
 `removed_disj_head_eq0.aspif`: `clasp --eq=0` fails `n < size()` in `LogicProgram::getDisj()` (dangling head edge to a removed disjunction).
+`usc_tag_conflict.aspif`: `clasp --partial-check=10,2 --lookahead=atom --opt-strategy=usc -n0 --opt-mode=optN` fails with "You must not mess with my root level!" instead of UNSATISFIABLE.
