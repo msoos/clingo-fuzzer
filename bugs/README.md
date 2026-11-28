@@ -15,3 +15,4 @@ Minimized reproducers of fixed bugs; the first line of each `.lp` is the failing
 `upper_head_iter_backprop.aspif`: `clasp --backprop` fails `n < size()` in `LogicProgram::getAtom()` (invalid head iterator in `addHeadsToUpper()`).
 `split_optn_sync.aspif`: `clasp -n0 --opt-mode=optN -t8,split` sometimes (about 2% of runs) reports the optimum but no optimal models (race in `ParallelSolve::requestWork()`).
 `dup_models_false_body_var.aspif`: `clasp -n0` reports 4 models instead of 2 (each answer set twice; unconstrained var of a body derived false during eq-preprocessing).
+`transform_eq_body.aspif`: `clasp --trans-ext=choice` fails `relevant() && h->relevant()` in `PrgBody::addHead()` (rule transformation used a merged body).
