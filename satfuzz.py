@@ -118,7 +118,8 @@ def solve(binary, opts, path, opt):
             if "Value" in w]
     if opt and wits:
         best = min(co for _, co in wits)
-        return cmd, collections.Counter(m for m, co in wits if co == best), best
+        # without preprocessing, an objective whose soft clauses all hold at the top level is dropped (no costs)
+        return cmd, collections.Counter(m for m, co in wits if co == best), tuple(x for x in best if x)
     return cmd, collections.Counter(m for m, _ in wits), None
 
 
