@@ -13,7 +13,7 @@ asp 1 0 0
 2 2 1 3 -3
 0
 ```
-Before: never terminates (UBSan: `minimize_constraint.cpp: signed integer overflow: 9223372036854775807 - -3`).  
+Before: never terminates (UBSan reports a `signed integer overflow` in `UncoreMinimize::pushPath()`).  
 After: `OPTIMUM FOUND`, `Optimization : 0 0` (as with `--opt-strategy=bb`).
 
 Saturate the slack and compare the bounds directly. Found by differential fuzzing (UBSan build).
