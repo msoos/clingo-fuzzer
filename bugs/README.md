@@ -20,3 +20,4 @@ Minimized reproducers of fixed bugs; the first line of each `.lp` is the failing
 `transform_integrity_scc.aspif`: `clasp --trans-ext=scc` fails `pos < size` in `Span::operator[]` (transformed rule h :- not h has no head after simplification).
 `usc_bound_overflow.aspif`: `clasp -n0 --opt-strategy=usc` never terminates (overflow of upper_ - lower_ with a negative lower bound; UBSan reports it).
 `empty_choice_transform.aspif`: `clasp --trans-ext=choice` (or `all`) never terminates on the empty choice rule `{}.`.
+`sum_opposite_goals_nolookback.lp`: `clingo -n0 --no-lookback` reports 2 answer sets instead of 3 (opposite subgoals of a sum body merged).
