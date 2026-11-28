@@ -90,6 +90,11 @@ def split(prog_lines, k, rng):
             if i == 0 or rng.random() < 0.5:
                 val[a] = rng.choice([FREE, TRUE, FALSE, FALSE, RELEASE] if i else [FREE, TRUE, FALSE])
                 steps[i].append(f"5 {m[a]} {val[a]}")
+        # assumptions hold for this step only
+        avail = [m[a] for a in order if step.get(a, 1) <= i + 1]
+        if avail and rng.random() < 0.4:
+            lits = [x * rng.choice([1, -1]) for x in rng.sample(avail, min(len(avail), rng.randint(1, 2)))]
+            steps[i].append(f"6 {len(lits)} " + " ".join(map(str, lits)))
     return "asp 1 0 0 incremental\n" + "".join("\n".join(s + ["0"]) + "\n" for s in steps)
 
 
@@ -107,11 +112,16 @@ def parse_steps(text):
 
 
 def prefix_program(steps, k):
-    """Single-shot aspif equivalent to steps 1..k: externals become choices (free), facts (true) or nothing."""
+    """Single-shot aspif equivalent to steps 1..k: externals become choices (free), facts (true) or nothing,
+    the assumptions of step k become integrity constraints."""
     body, val = [], {}
-    for s in steps[:k]:
+    for i, s in enumerate(steps[:k]):
         for line in s:
-            if line.startswith("5 "):
+            if line.startswith("6 "):
+                if i == k - 1:
+                    for l in map(int, line.split()[2:]):
+                        body.append(f"1 0 0 0 1 {-l}")
+            elif line.startswith("5 "):
                 _, a, v = line.split()
                 if val.get(a) != RELEASE:
                     val[a] = int(v)
