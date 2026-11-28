@@ -141,14 +141,14 @@ def prefix_program(steps, k):
 
 
 def models_of(js, opt):
-    """Per call: all models, or for optimization the optimal models and the optimum (leading zero levels dropped)."""
+    """Per call: all models, or for optimization the optimal models and the optimum (zero levels dropped)."""
     res = []
     for c in js.get("Call", []):
         wits = [(frozenset(w["Value"]), tuple(w.get("Costs", []))) for w in c.get("Witnesses", []) if "Value" in w]
         if opt and wits:
             best = min(co for _, co in wits)
             wits = [(m, co) for m, co in wits if co == best]
-            norm = best[next((i for i, x in enumerate(best) if x), len(best)):]
+            norm = tuple(x for x in best if x)  # the runs may differ in (all-zero) priority levels
             res.append(([m for m, _ in wits], norm))
         else:
             res.append(([m for m, _ in wits], None))
