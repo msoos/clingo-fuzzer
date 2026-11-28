@@ -23,3 +23,4 @@ Minimized reproducers of fixed bugs; the first line of each `.lp` is the failing
 `sum_opposite_goals_nolookback.lp`: `clingo -n0 --no-lookback` reports 2 answer sets instead of 3 (opposite subgoals of a sum body merged).
 `vmtf_single_element_inc.aspif`: `clasp -n0 --heuristic=vmtf` fails `!score_[v].inList()` in `ClaspVmtf::addToList()` (incremental; single-element list after step 1).
 `assumption_aux_atom.aspif`: `clasp -n0 --trans-ext=all` reports 1 answer set instead of 2 (assumed atom reused as aux atom of the transformed choice rule).
+`propagate_after_conflict_inc.aspif`: `clasp -n0` fails `!hasConflict() || isTrue(p)` in `Solver::force()` in step 2 (incremental; cleanup after a conflict propagates again).
