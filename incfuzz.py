@@ -47,6 +47,9 @@ def renumber(line, m):
         t[4:] = [lit(x) for x in t[4:]]
     elif t[0] == "5":
         t[1] = str(m[int(t[1])])
+    elif t[0] == "7":  # 7 <type> <atom> <bias> <prio> <n> <lits>
+        t[2] = str(m[int(t[2])])
+        t[6:] = [lit(x) for x in t[6:]]
     elif t[0] == "2":  # 2 <prio> <n> <lit> <weight> ...
         for i in range(int(t[2])):
             t[3 + 2 * i] = lit(t[3 + 2 * i])
@@ -65,6 +68,9 @@ def split(prog_lines, k, rng):
             outs.append((line, lits))
         elif st[0] == 2:
             mins.append((line, [abs(int(x)) for x in line.split()[3::2]]))
+        elif st[0] == 7:  # heuristics don't change the answer sets
+            t = line.split()
+            mins.append((line, [int(t[2])] + [abs(int(x)) for x in t[6:]]))
     defined = {a for _, h, _ in rules for a in h}
     used = {a for _, _, b in rules for a in b} | {a for _, l in outs + mins for a in l}
     step = {a: rng.randint(1, k) for a in defined}
@@ -208,7 +214,7 @@ def one_test(seed, stats):
     try:
         run([options.clingo, "--mode=gringo", t["prog"]], outfile=ground)
         lines = [l for l in open(ground).read().splitlines()[1:] if l.strip() and l.strip() != "0"]
-        lines = [l for l in lines if l.startswith(("1 ", "4 ", "2 "))]
+        lines = [l for l in lines if l.startswith(("1 ", "4 ", "2 ", "7 "))]
         with open(inc, "w") as f:
             f.write(split(lines, rng.randint(2, 4), rng))
         for _ in range(3):
