@@ -12,6 +12,7 @@ import signal
 import stat
 import subprocess
 import sys
+import time
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 RED, GREEN, YELLOW, MAGENTA, NC = "\033[31m", "\033[32m", "\033[33m", "\033[35m", "\033[0m"
@@ -50,6 +51,12 @@ class Skip(Exception):
     pass
 
 
+class Timeout(Skip):
+    def __init__(self, cmd):
+        super().__init__("timeout: " + cmd_str(cmd))
+        self.cmd = cmd
+
+
 def unique_file(prefix, suffix=".lp", max_num_files=100000):
     counter = 1
     while True:
@@ -70,7 +77,7 @@ def cmd_str(cmd):
     return " ".join(shlex.quote(str(x)) for x in cmd)
 
 
-def run(cmd, outfile=None):
+def run(cmd, outfile=None, tout=None):
     global current_proc
     if options.verbose:
         print(f"{MAGENTA}--> {cmd_str(cmd)}{NC}")
@@ -78,12 +85,12 @@ def run(cmd, outfile=None):
     proc = subprocess.Popen(cmd, stdout=out, stderr=subprocess.PIPE, text=True, env=ENV)
     current_proc = proc
     try:
-        so, se = proc.communicate(timeout=options.tout)
+        so, se = proc.communicate(timeout=tout or options.tout)
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.communicate()
         current_proc = None
-        raise Skip("timeout: " + cmd_str(cmd))
+        raise Timeout(cmd)
     finally:
         if outfile:
             out.close()
@@ -395,6 +402,16 @@ def pick_cands(t):
     return cands
 
 
+def check_hang(cmd, ref_time):
+    tout = 12 * options.tout
+    try:
+        run(cmd, tout=tout)
+    except Skip:
+        raise Bug(f"hang: no result within {tout:.0f}s, reference took {ref_time:.2f}s\n--> {cmd_str(cmd)}")
+    except Bug:
+        pass
+
+
 def one_test(seed):
     random.seed(seed)
     t = {"seed": seed, "task": options.task or random.choices(TASKS, [5, 3, 2])[0],
@@ -406,12 +423,19 @@ def one_test(seed):
     pipe, kind, copts, binary = "ref", "ref", [], options.clingo
     try:
         t["ref_cmd"] = [options.clingo, "--outf=2", *REF, *task_opts(t["task"]), t["prog"]]
+        start = time.time()
         ref = solve(options.clingo, [t["prog"]], REF + task_opts(t["task"]), ref=True)
+        ref_time = time.time() - start
         stats["unsat" if ref.status == "UNSATISFIABLE" else "sat"] += 1
         for pipe, kind, copts, binary in pick_cands(t):
             try:
                 run_cand(t, ref, pipe, kind, copts, binary)
                 stats["runs"] += 1
+            except Timeout as e:
+                stats["skips"] += 1
+                # reify/text and ASan runs are legitimately much slower than the reference
+                if pipe in ("direct", "aspif") and binary == options.clingo and ref_time < options.tout / 50:
+                    check_hang(e.cmd, ref_time)
             except Skip as e:
                 stats["skips"] += 1
                 if options.verbose:

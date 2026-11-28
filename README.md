@@ -5,6 +5,7 @@ gringo 5 syntax; `fuzz.py` solves each with a reference configuration (clasp pre
 `--eq=0 --no-backprop --trans-ext=no --sat-prepro=no`) and with random option sets, through different
 pipelines (direct, `--mode=gringo` aspif, `--text`, `--output=reify` + `meta.lp`), and compares answer sets,
 optima, optimal models, brave/cautious consequences, projections, and crashes/sanitizer reports.
+A candidate that times out although the reference was fast is re-run with a 12x timeout and reported as a hang.
 
 ## Build
 
