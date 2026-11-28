@@ -12,6 +12,7 @@ import signal
 import stat
 import subprocess
 import sys
+import tempfile
 import time
 
 HERE = os.path.dirname(os.path.realpath(__file__))
@@ -22,6 +23,7 @@ ENV = dict(os.environ,
            UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1")
 REF = ["--eq=0", "--no-backprop", "--trans-ext=no", "--sat-prepro=no"]
 OK_RC = {0, 10, 20, 30}
+MAX_OUT = 64 << 20
 BAD_OUT = ["AddressSanitizer", "LeakSanitizer", "runtime error:", "Assertion", "*** ERROR"]
 TASKS = ["enum", "opt", "proj"]
 OPT_ERR = ["*** ERROR: (clingo): <config>", "*** ERROR: (clingo): In context",
@@ -82,7 +84,8 @@ def run(cmd, outfile=None, tout=None):
     global current_proc
     if options.verbose:
         print(f"{MAGENTA}--> {cmd_str(cmd)}{NC}")
-    out = open(outfile, "w") if outfile else subprocess.PIPE
+    # a file instead of a pipe, so that huge outputs (millions of models) can be skipped without reading them
+    out = open(outfile, "w") if outfile else tempfile.TemporaryFile("w+")
     proc = subprocess.Popen(cmd, stdout=out, stderr=subprocess.PIPE, text=True, env=ENV)
     current_proc = proc
     try:
@@ -96,6 +99,8 @@ def run(cmd, outfile=None, tout=None):
         if outfile:
             out.close()
     current_proc = None
+    if not outfile:
+        size = out.seek(0, os.SEEK_END)
     if any(e in se for e in OPT_ERR):
         stats["opt_errs"] += 1
         raise Skip("option error: " + se.strip().splitlines()[0])
@@ -109,7 +114,13 @@ def run(cmd, outfile=None, tout=None):
         first = next((i for i, l in enumerate(lines) if "runtime error:" in l or "ERROR: " in l or "leak of" in l), None)
         tail = "\n".join(lines[first:first + 40] if first is not None else lines[-15:])
         raise Bug(f"crash/error rc={proc.returncode}\n{tail}\n--> {cmd_str(cmd)}")
-    return so or ""
+    if outfile:
+        return ""
+    with out:
+        if size > MAX_OUT:
+            raise Skip(f"output too large ({size >> 20} MB): {cmd_str(cmd)}")
+        out.seek(0)
+        return out.read()
 
 
 class Result:
