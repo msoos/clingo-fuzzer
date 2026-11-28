@@ -47,12 +47,15 @@ def renumber(line, m):
         t[4:] = [lit(x) for x in t[4:]]
     elif t[0] == "5":
         t[1] = str(m[int(t[1])])
+    elif t[0] == "2":  # 2 <prio> <n> <lit> <weight> ...
+        for i in range(int(t[2])):
+            t[3 + 2 * i] = lit(t[3 + 2 * i])
     return " ".join(t)
 
 
 def split(prog_lines, k, rng):
     """Distribute the rules/outputs of a single-shot aspif into k steps; returns incremental aspif text."""
-    rules, outs = [], []
+    rules, outs, mins = [], [], []
     for line in prog_lines:
         st = [int(x) if x.lstrip("-").isdigit() else x for x in line.split()]
         if st[0] == 1:
@@ -60,8 +63,10 @@ def split(prog_lines, k, rng):
         elif st[0] == 4:
             lits = [abs(int(x)) for x in line.split()[4:]]  # 4 <len> <name> <n> <lits>
             outs.append((line, lits))
+        elif st[0] == 2:
+            mins.append((line, [abs(int(x)) for x in line.split()[3::2]]))
     defined = {a for _, h, _ in rules for a in h}
-    used = {a for _, _, b in rules for a in b} | {a for _, l in outs for a in l}
+    used = {a for _, _, b in rules for a in b} | {a for _, l in outs + mins for a in l}
     step = {a: rng.randint(1, k) for a in defined}
     changed = True
     while changed:
@@ -80,7 +85,7 @@ def split(prog_lines, k, rng):
     for line, h, b in rules:
         s = max([step[a] for a in h] + [step.get(a, 1) for a in b] + [1])
         steps[s - 1].append(renumber(line, m))
-    for line, lits in outs:
+    for line, lits in outs + mins:  # minimize statements of all steps accumulate
         steps[max([step.get(a, 1) for a in lits] + [1]) - 1].append(renumber(line, m))
     val = {}
     for i in range(k):
@@ -135,16 +140,23 @@ def prefix_program(steps, k):
     return "asp 1 0 0\n" + "\n".join(body + ["0"]) + "\n"
 
 
-def models_of(js):
+def models_of(js, opt):
+    """Per call: all models, or for optimization the optimal models and the optimum (leading zero levels dropped)."""
     res = []
     for c in js.get("Call", []):
-        wits = [frozenset(w["Value"]) for w in c.get("Witnesses", []) if "Value" in w]
-        res.append(wits)
+        wits = [(frozenset(w["Value"]), tuple(w.get("Costs", []))) for w in c.get("Witnesses", []) if "Value" in w]
+        if opt and wits:
+            best = min(co for _, co in wits)
+            wits = [(m, co) for m, co in wits if co == best]
+            norm = best[next((i for i, x in enumerate(best) if x), len(best)):]
+            res.append(([m for m, _ in wits], norm))
+        else:
+            res.append(([m for m, _ in wits], None))
     return res
 
 
-def solve(binary, opts, path, tout=None):
-    cmd = [binary, "--outf=2", "-n0", *opts, path]
+def solve(binary, opts, path, opt, tout=None):
+    cmd = [binary, "--outf=2", "-n0", *(["--opt-mode=optN"] if opt else []), *opts, path]
     out = run(cmd, tout=tout)
     try:
         js = json.loads(out)
@@ -152,26 +164,31 @@ def solve(binary, opts, path, tout=None):
         raise Bug(f"bad JSON output ({e})\n--> {cmd_str(cmd)}")
     if js.get("Result") == "UNKNOWN" or js.get("Models", {}).get("More", "no") != "no":
         raise Skip("unfinished: " + cmd_str(cmd))
-    return cmd, models_of(js)
+    return cmd, models_of(js, opt)
 
 
 def check(inc_path, copts, binary):
     steps = parse_steps(open(inc_path).read())
+    opt = any(l.startswith("2 ") for s in steps for l in s)
     tmp = fuzz.unique_file("incref", ".aspif")
     try:
-        cmd, cand = solve(binary, copts, inc_path)
+        cmd, cand = solve(binary, copts, inc_path, opt)
         if len(cand) > len(steps):
             raise Bug(f"{len(cand)} calls for {len(steps)} steps\n--> {cmd_str(cmd)}")
-        cand += [[]] * (len(steps) - len(cand))  # clasp stops after a top-level conflict: later steps are unsat
+        cand += [([], None)] * (len(steps) - len(cand))  # clasp stops after a top-level conflict: later steps are unsat
         for k in range(1, len(steps) + 1):
             with open(tmp, "w") as f:
                 f.write(prefix_program(steps, k))
-            rcmd, ref = solve(options.clasp, fuzz.REF, tmp)
-            a, b = set(ref[0]), set(cand[k - 1])
-            if len(ref[0]) != len(cand[k - 1]) or a != b:
+            rcmd, ref = solve(options.clasp, fuzz.REF, tmp, opt)
+            (rm, rc), (cm, cc) = ref[0], cand[k - 1]
+            a, b = set(rm), set(cm)
+            if cc != rc and rm and cm:
+                raise Bug(f"step {k}: optimum {cc} vs {rc} (ref)\n--> failing: {cmd_str(cmd)}\n"
+                          f"--> reference (step {k} as single shot): {cmd_str(rcmd)}")
+            if (not opt and len(rm) != len(cm)) or a != b:
                 only_r = " ".join("{" + " ".join(sorted(m)) + "}" for m in sorted(a - b, key=sorted)[:3])
                 only_c = " ".join("{" + " ".join(sorted(m)) + "}" for m in sorted(b - a, key=sorted)[:3])
-                raise Bug(f"step {k}: {len(cand[k-1])} models vs {len(ref[0])} (ref); only in ref: {only_r}; "
+                raise Bug(f"step {k}: {len(cm)} {'optimal ' if opt else ''}models vs {len(rm)} (ref); only in ref: {only_r}; "
                           f"only in cand: {only_c}\n--> failing: {cmd_str(cmd)}\n--> reference (step {k} as single shot): {cmd_str(rcmd)}")
     finally:
         if not options.keep:
@@ -181,7 +198,7 @@ def check(inc_path, copts, binary):
 def one_test(seed, stats):
     rng = random.Random(seed)
     random.seed(seed)
-    t = {"task": "enum", "size": rng.choice(["small", "normal"]), "gseed": rng.randint(0, 2**62),
+    t = {"task": "opt" if rng.random() < 0.3 else "enum", "size": rng.choice(["small", "normal"]), "gseed": rng.randint(0, 2**62),
          "reifiable": False, "neg": rng.random() < 0.4}
     fuzz.gen_prog(t)
     ground = fuzz.unique_file("incground", ".aspif")
@@ -191,12 +208,11 @@ def one_test(seed, stats):
     try:
         run([options.clingo, "--mode=gringo", t["prog"]], outfile=ground)
         lines = [l for l in open(ground).read().splitlines()[1:] if l.strip() and l.strip() != "0"]
-        if any(not l.startswith(("1 ", "4 ")) for l in lines):
-            lines = [l for l in lines if l.startswith(("1 ", "4 "))]
+        lines = [l for l in lines if l.startswith(("1 ", "4 ", "2 "))]
         with open(inc, "w") as f:
             f.write(split(lines, rng.randint(2, 4), rng))
         for _ in range(3):
-            copts = [o for o in fuzz.rnd_opts("enum", threads_ok=True) if not o.startswith(GROUND_ONLY)]
+            copts = [o for o in fuzz.rnd_opts(t["task"], threads_ok=True) if not o.startswith(GROUND_ONLY)]
             binary = options.asan if options.asan and rng.random() < options.asan_perc / 100 else options.clasp
             try:
                 check(inc, copts, binary)
