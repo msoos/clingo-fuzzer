@@ -89,9 +89,10 @@ def gen_rule():
     agg = None
     if NARY and rnd.random() < 0.3:
         ap = rnd.choice(NARY)
-        args = [Term("W")] + [rterm(vs, False) for _ in range(preds[ap] - 1)]
+        two = preds[ap] == 2 and rnd.random() < 0.4  # second local variable U
+        args = [Term("W")] + ([Term("U")] if two else [rterm(vs, False) for _ in range(preds[ap] - 1)])
         fun = rnd.choice(["#count", "#sum", "#min", "#max"])
-        agg = (fun, (ap, args), rnd.choice([">=", "<=", "!=", "="]), rnd.randint(-1, K + 2), rnd.random() < 0.25)
+        agg = (fun, (ap, args), rnd.choice([">=", "<=", "!=", "="]), rnd.randint(-1, K + 2), rnd.random() < 0.25, two)
     kind = rnd.choice(["normal", "normal", "choice", "constraint", "condchoice", "disj", "interval"])
     head = ratom(vs, arith=True)
 
@@ -103,9 +104,10 @@ def gen_rule():
             parts.append(f"{'not ' if condlit[0] else ''}{condlit[1]}(V) : d(V)")
         parts += [f"{l.show()}{op}{r.show()}" for op, l, r in cmps]
         if agg:
-            fun, at, op, bound, naf = agg
-            tup = "W,W" if fun == "#sum" else "W"
-            parts.append(f"{'not ' if naf else ''}{fun} {{ {tup} : {show_atom(at)}, d(W) }} {op} {bound}")
+            fun, at, op, bound, naf, two = agg
+            tup = ("W,W" if fun == "#sum" else "W") + (",U" if two else "")
+            dom = "d(W), d(U)" if two else "d(W)"
+            parts.append(f"{'not ' if naf else ''}{fun} {{ {tup} : {show_atom(at)}, {dom} }} {op} {bound}")
         return parts
 
     def bodies_g(s):
@@ -116,11 +118,11 @@ def gen_rule():
         if condlit:
             parts += [f"{'not ' if condlit[0] else ''}{condlit[1]}({v}) : d({v})" for v in DOM]
         if agg:
-            fun, at, op, bound, naf = agg
+            fun, at, op, bound, naf, two = agg
             elems = []
-            for w in DOM:
-                tup = f"{w},{w}" if fun == "#sum" else f"{w}"
-                elems.append(f"{tup} : {show_atom(at, dict(s, W=w))}")
+            for w, u in itertools.product(DOM, DOM if two else [None]):
+                tup = (f"{w},{w}" if fun == "#sum" else f"{w}") + (f",{u}" if two else "")
+                elems.append(f"{tup} : {show_atom(at, dict(s, W=w, U=u))}")
             parts.append(f"{'not ' if naf else ''}{fun} {{ {'; '.join(elems)} }} {op} {bound}")
         if not pool:
             return [parts]
@@ -164,6 +166,16 @@ for _ in range(rnd.randint(2, 14)):
     ng_lines.append(ng)
     for vals in itertools.product(DOM, repeat=len(vs)):
         g_lines += g(dict(zip(vs, vals)))
+if NARY and rnd.random() < 0.3:  # optimization over non-ground statements
+    for _ in range(rnd.randint(1, 2)):
+        q, prio, off = rnd.choice(NARY), rnd.randint(0, 1), rnd.choice([0, -1])
+        if preds[q] == 1:
+            ng_lines.append(f"#minimize {{ W{off:+d}@{prio},W : {q}(W), d(W) }}.")
+            g_lines.append("#minimize { " + "; ".join(f"{w + off}@{prio},{w} : {q}({w})" for w in DOM) + " }.")
+        else:
+            ng_lines.append(f"#minimize {{ W+U{off:+d}@{prio},W,U : {q}(W,U), d(W), d(U) }}.")
+            g_lines.append("#minimize { " + "; ".join(f"{w + u + off}@{prio},{w},{u} : {q}({w},{u})"
+                                                    for w in DOM for u in DOM) + " }.")
 shows = ["#show."] + [f"#show {q}/{ar}." for q, ar in preds.items()]
 open(a.ng, "w").write("\n".join(ng_lines + shows) + "\n")
 open(a.ground, "w").write("\n".join(g_lines + shows) + "\n")

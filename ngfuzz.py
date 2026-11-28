@@ -16,7 +16,9 @@ GROUND_OPTS = ("--keep-facts", "--preserve-facts")
 
 
 def check(ng, ground, pipe, copts, binary):
-    ref = fuzz.solve(options.clingo, [ground], fuzz.REF + ["-n0"], ref=True)
+    task = "opt" if "#minimize" in open(ng).read() else "enum"
+    extra = ["-n0"] + (["--opt-mode=optN"] if task == "opt" else [])
+    ref = fuzz.solve(options.clingo, [ground], fuzz.REF + extra, ref=True)
     gopts = [o for o in copts if o.startswith(GROUND_OPTS)]
     sopts = [o for o in copts if not o.startswith(GROUND_OPTS)]
     tmp = None
@@ -26,9 +28,9 @@ def check(ng, ground, pipe, copts, binary):
         else:
             tmp = fuzz.ground_to(pipe, ng, gopts)
             inputs = [tmp]
-        cand = fuzz.solve(binary, inputs, sopts + ["-n0"])
+        cand = fuzz.solve(binary, inputs, sopts + extra)
         try:
-            fuzz.compare("enum", ref, cand, "direct")
+            fuzz.compare(task, ref, cand, "aspif" if task == "opt" else "direct")
         except Bug as e:
             raise Bug(f"{e}\n--> failing: {fuzz.cmd_str(cand.cmd)}\n--> reference: {fuzz.cmd_str(ref.cmd)}")
     finally:
@@ -49,7 +51,7 @@ def one_test(seed, stats):
     try:
         for _ in range(3):
             pipe = rng.choice(["direct", "direct", "aspif", "text"])
-            copts = fuzz.rnd_opts("enum", threads_ok=True)
+            copts = fuzz.rnd_opts("opt" if "#minimize" in open(ng).read() else "enum", threads_ok=True)
             binary = options.asan if options.asan and rng.random() < options.asan_perc / 100 else options.clingo
             try:
                 check(ng, ground, pipe, copts, binary)
