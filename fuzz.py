@@ -24,7 +24,8 @@ REF = ["--eq=0", "--no-backprop", "--trans-ext=no", "--sat-prepro=no"]
 OK_RC = {0, 10, 20, 30}
 BAD_OUT = ["AddressSanitizer", "LeakSanitizer", "runtime error:", "Assertion", "*** ERROR"]
 TASKS = ["enum", "opt", "proj"]
-OPT_ERR = ["*** ERROR: (clingo): <config>", "*** ERROR: (clingo): In context"]
+OPT_ERR = ["*** ERROR: (clingo): <config>", "*** ERROR: (clingo): In context",
+           "*** ERROR: (clasp): <config>", "*** ERROR: (clasp): In context"]
 # already reported, see bugs/; --no-known turns this off
 KNOWN = {}
 

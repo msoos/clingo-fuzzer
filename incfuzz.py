@@ -247,6 +247,8 @@ if __name__ == "__main__":
         except Bug as e:
             print(f"{RED}BUG FOUND: {e}{NC}")
             sys.exit(1)
+        except Skip as e:
+            print(f"SKIP: {e}")
         sys.exit(0)
     stats = {"tests": 0, "runs": 0, "skips": 0, "bugs": 0}
     for i in range(options.only):
